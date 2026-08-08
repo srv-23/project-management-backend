@@ -1,5 +1,5 @@
 import { body } from "express-validator";
-
+import { AvailableUserRoles } from "../utils/constants.js";
 const userRegisterValidator = () => {
   return [
     body("email")
@@ -13,15 +13,10 @@ const userRegisterValidator = () => {
       .notEmpty()
       .withMessage("Username is required")
       .isLowercase()
-      .withMessage("Username must be in lowercase")
+      .withMessage("Username must be in lower case")
       .isLength({ min: 3 })
       .withMessage("Username must be at least 3 characters long"),
-    body("password")
-      .trim()
-      .notEmpty()
-      .withMessage("Password is required")
-      .isLength({ min: 6 })
-      .withMessage("Password must be at least 6 characters long"),
+    body("password").trim().notEmpty().withMessage("Password is required"),
     body("fullName").optional().trim(),
   ];
 };
@@ -51,8 +46,29 @@ const userForgotPasswordValidator = () => {
 };
 
 const userResetForgotPasswordValidator = () => {
+  return [body("newPassword").notEmpty().withMessage("Password is required")];
+};
+
+const createProjectValidator = () => {
   return [
-    body("newPassword").notEmpty().withMessage("New password is required"),
+    body("name").notEmpty().withMessage("Name is required"),
+    body("description").optional(),
+  ];
+};
+
+const addMembertoProjectValidator = () => {
+  return [
+    body("email")
+      .trim()
+      .notEmpty()
+      .withMessage("Email is required")
+      .isEmail()
+      .withMessage("Email is invalid"),
+    body("role")
+      .notEmpty()
+      .withMessage("Role is required")
+      .isIn(AvailableUserRoles)
+      .withMessage("Role is invalid"),
   ];
 };
 
@@ -62,4 +78,6 @@ export {
   userChangeCurrentPasswordValidator,
   userForgotPasswordValidator,
   userResetForgotPasswordValidator,
+  createProjectValidator,
+  addMembertoProjectValidator,
 };
