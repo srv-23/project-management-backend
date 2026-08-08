@@ -1,91 +1,85 @@
 # Project Manager
 
-Project Manager is a Node.js and Express backend API for user authentication, email verification, password recovery, and protected user session handling. It uses MongoDB with Mongoose, JWT-based access and refresh tokens, and SMTP email delivery for verification and reset flows.
+Project Manager is a Node.js + Express backend API for simple project and membership management with a full authentication flow (email verification, refresh tokens, password reset) and MongoDB persistence.
 
 ## Features
 
-- User registration and login
-- Email verification flow
-- Refresh token support
-- Protected current-user and logout endpoints
-- Change password and forgot-password/reset-password flow
+- User registration & login with email verification
+- Access + refresh JWT tokens (cookie + header support)
+- Forgot / reset password flow via email
+- Protected endpoints for current user, logout, change password
+- Projects: create, update, delete, list
+- Project membership: add, list, update role, remove
 - Health check endpoint
-- MongoDB persistence with Mongoose
-- Cookie-based token storage with CORS support
 
-## Tech Stack
+## Tech stack
 
-- Node.js
+- Node.js (ES modules)
 - Express 5
-- MongoDB
-- Mongoose
-- JSON Web Tokens
-- bcrypt
-- nodemailer
-- mailgen
+- MongoDB + Mongoose
+- JSON Web Tokens (JWT)
+- bcrypt, nodemailer, mailgen
 
-## Project Structure
+## Project layout
 
 ```text
 src/
-  app.js                 # Express app configuration
-  index.js               # Server bootstrap and database connection
-  controllers/           # Route handlers
-  db/                    # MongoDB connection
-  middlewares/           # Auth and validation middleware
-  models/                # Mongoose models
-  routes/                # API route definitions
-  utils/                 # Shared helpers and response/error wrappers
-  validators/            # express-validator schemas
-public/                  # Static assets
+   app.js                 # Express app, middleware, route mounting
+   index.js               # bootstrap (DB connect + server)
+   controllers/           # request handlers
+   db/                    # MongoDB connection helper
+   middlewares/           # auth, validation, upload
+   models/                # Mongoose models (User, Project, ProjectMember, ...)
+   routes/                # route definitions
+   utils/                 # helpers (mail, responses, errors)
+   validators/            # request validators
+public/                  # served static files (images, etc.)
 ```
 
-## Prerequisites
+## Requirements
 
-- Node.js 18 or newer
-- MongoDB connection string
-- SMTP account for outgoing emails
+- Node.js (v18+ recommended)
+- A reachable MongoDB instance
+- An SMTP account for outgoing emails (verification / reset)
 
-## Installation
+## Install & run
 
-1. Install dependencies:
+Install dependencies:
 
-   ```bash
-   npm install
-   ```
+```bash
+npm install
+```
 
-2. Create a `.env` file in the project root and set the required variables.
+Start in development (uses `nodemon`):
 
-3. Start the development server:
+```bash
+npm run dev
+```
 
-   ```bash
-   npm run dev
-   ```
+Start in production:
 
-4. Start the production server:
+```bash
+npm start
+```
 
-   ```bash
-   npm start
-   ```
+## Environment variables
 
-## Environment Variables
+Required variables (create a `.env` file in project root):
 
-The application reads the following environment variables:
+- `PORT` — server port (default: `3000`)
+- `MONGO_URI` — MongoDB connection string
+- `CORS_ORIGIN` — comma-separated allowed origins (optional)
+- `ACCESS_TOKEN_SECRET` — secret for access tokens
+- `ACCESS_TOKEN_EXPIRY` — access token lifetime (e.g. `1d`)
+- `REFRESH_TOKEN_SECRET` — secret for refresh tokens
+- `REFRESH_TOKEN_EXPIRY` — refresh token lifetime (e.g. `10d`)
+- `SMTP_HOST` — SMTP server host
+- `SMTP_PORT` — SMTP server port
+- `SMTP_USER` — SMTP username
+- `SMTP_PASSWORD` — SMTP password
+- `FORGOT_PASSWORD_REDIRECT_URL` — frontend URL used in password reset emails
 
-- `PORT` - Server port, defaults to `3000`
-- `MONGO_URI` - MongoDB connection string
-- `CORS_ORIGIN` - Allowed frontend origin or comma-separated origins
-- `ACCESS_TOKEN_SECRET` - Secret used to sign access tokens
-- `ACCESS_TOKEN_EXPIRY` - Access token lifetime
-- `REFRESH_TOKEN_SECRET` - Secret used to sign refresh tokens
-- `REFRESH_TOKEN_EXPIRY` - Refresh token lifetime
-- `SMTP_HOST` - SMTP server host
-- `SMTP_PORT` - SMTP server port
-- `SMTP_USER` - SMTP username
-- `SMTP_PASSWORD` - SMTP password
-- `FORGOT_PASSWORD_REDIRECT_URL` - Frontend URL used in password reset emails
-
-Example:
+Example `.env`:
 
 ```env
 PORT=3000
@@ -102,62 +96,68 @@ SMTP_PASSWORD=your-smtp-password
 FORGOT_PASSWORD_REDIRECT_URL=http://localhost:5173/reset-password
 ```
 
-## API Base Path
+## Scripts
 
-All routes are mounted under `/api/v1`.
+- `npm run dev` — start with `nodemon` (development)
+- `npm start` — start production server
 
-## Endpoints
+## API (base path `/api/v1`)
 
-### Health Check
+**Health**
 
-- `GET /api/v1/healthcheck`
+- `GET /api/v1/healthcheck` — simple status check
 
-Returns a simple server status response.
+**Auth**
 
-### Auth
+- `POST /api/v1/auth/register` — register a new user
+  - body: `{ email, username, password, fullName? }`
+- `POST /api/v1/auth/login` — login with email + password
+  - body: `{ email, password }`
+- `GET /api/v1/auth/verify-email/:verificationToken` — verify email
+- `POST /api/v1/auth/refresh-token` — refresh access token (uses `refreshToken` cookie or body)
+- `POST /api/v1/auth/forgot-password` — request password reset
+  - body: `{ email }`
+- `POST /api/v1/auth/reset-password/:resetToken` — reset password
+  - body: `{ newPassword }`
+- `POST /api/v1/auth/logout` — logout (clears token cookies) — protected
+- `POST /api/v1/auth/current-user` — fetch current user — protected
+- `POST /api/v1/auth/change-password` — change password — protected
+  - body: `{ oldPassword, newPassword }`
+- `POST /api/v1/auth/resend-email-verification` — resend verification email — protected
 
-- `POST /api/v1/auth/register`
-- `POST /api/v1/auth/login`
-- `GET /api/v1/auth/verify-email/:verificationToken`
-- `POST /api/v1/auth/refresh-token`
-- `POST /api/v1/auth/forgot-password`
-- `POST /api/v1/auth/reset-password/:resetToken`
-- `POST /api/v1/auth/logout`
-- `GET /api/v1/auth/current-user`
-- `POST /api/v1/auth/change-password`
-- `POST /api/v1/auth/resend-email-verification`
+> Protected routes require a valid access token provided either via the `Authorization: Bearer <token>` header or the `accessToken` cookie.
 
-## Request Notes
+**Projects** (all project routes require authentication)
 
-- `register` expects `email`, `username`, and `password`, and the user model also requires `fullName`.
-- `login` uses `email` and `password`.
-- Protected routes require a valid access token in either the `Authorization: Bearer <token>` header or the `accessToken` cookie.
-- Token refresh uses the `refreshToken` cookie or a `refreshToken` field in the request body.
+- `GET /api/v1/projects` — list projects for current user
+- `POST /api/v1/projects` — create project
+  - body: `{ name, description? }`
+- `GET /api/v1/projects/:projectId` — get project details (permission checked)
+- `PUT /api/v1/projects/:projectId` — update project (admin only)
+- `DELETE /api/v1/projects/:projectId` — delete project (admin only)
 
-## Response Format
+**Project members**
 
-The API uses a shared response wrapper with a consistent structure:
+- `GET /api/v1/projects/:projectId/members` — list members
+- `POST /api/v1/projects/:projectId/members` — add/update member (admin only)
+  - body: `{ email, role }` where `role` is one of `admin`, `project_admin`, `member`
+- `PUT /api/v1/projects/:projectId/members/:userId` — update member role (admin only)
+- `DELETE /api/v1/projects/:projectId/members/:userId` — remove member (admin only)
 
-```json
-{
-  "statusCode": 200,
-  "data": {},
-  "message": "Success",
-  "success": true
-}
-```
+## Validation and response format
 
-Errors use a similar wrapper with `success: false` and a status code/message pair.
+- Request validation is implemented with `express-validator`. Validation middleware returns `422` with details when payloads are invalid.
+- Successful responses use a shared wrapper: `{ statusCode, data, message, success }`.
+- Errors are thrown as `ApiError` and follow the same wrapper with `success: false`.
 
-## Static Assets
+## Static files
 
-The `public/` directory is served statically by Express, so files placed there are available directly from the server.
+- `public/` is served statically (uploads stored under `public/images`).
 
-## Notes
+## Notes & caveats
 
-- Cookies for access and refresh tokens are set as `httpOnly` and `secure`.
-- Email verification and password reset links are generated from the configured SMTP and frontend redirect settings.
-- The server will fail to start if MongoDB cannot be reached.
+- Cookies for tokens are set as `httpOnly` and `secure` in the code — when testing locally you may need to adjust cookie handling or run over HTTPS to persist cookies across browsers.
+- Some internal links generated by controllers may reference different paths; the source of truth for routes is the files in `src/routes/`.
 
 ## License
 
